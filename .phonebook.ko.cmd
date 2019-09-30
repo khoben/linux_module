@@ -1,0 +1,1 @@
+cmd_/home/khoben/eclipse-workspace/linux_module//phonebook.ko := ld -r -m elf_x86_64  -z max-page-size=0x200000  --build-id  -T ./scripts/module-common.lds -o /home/khoben/eclipse-workspace/linux_module//phonebook.ko /home/khoben/eclipse-workspace/linux_module//phonebook.o /home/khoben/eclipse-workspace/linux_module//phonebook.mod.o;  true
