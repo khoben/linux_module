@@ -15,9 +15,9 @@
 
 struct PhoneBookRecord
 {
-	char* fio;
-	char* adress;
-	char* phoneNumber;
+	char fio[128];
+	char adress[128];
+	char phoneNumber[128];
 };
 
 struct PhoneBook
@@ -30,7 +30,10 @@ struct PhoneBook*
 createPhoneBook(void);
 
 void
-loadPhoneBook(struct PhoneBook book);
+freePhoneBook(void);
+
+void
+loadPhoneBook(struct PhoneBook *book, char* buf, unsigned bufLenght);
 
 void
 putRecord(struct PhoneBook *book, char* fio, char* adress, char* phoneNumber);

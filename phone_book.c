@@ -15,24 +15,82 @@ struct PhoneBook *createPhoneBook(void)
 	return newBook;
 }
 
-void loadPhoneBook(struct PhoneBook book)
+void freePhoneBook(void)
 {
 
 }
 
+void loadPhoneBook(struct PhoneBook *book, char* buf, unsigned bufLenght)
+{
+	if (buf == NULL || strlen(buf) == 0)
+	{
+		printk(KERN_ALERT "empty buffer loads");
+		return;
+	}
+	char bufLine[128] =
+	{ };
+	char fioBuf[128] =
+	{ };
+	char adressBuf[128] =
+	{ };
+	char phoneBuf[128] =
+	{ };
+
+	char ch = buf[0];
+	int id = 0, idCharLine = 0;
+	bool isFirstLine = true;
+	while (id < bufLenght)
+	{
+		//skip first line
+		if (ch != '\n')
+		{
+			if (!isFirstLine)
+			{
+				//append symbols to line buffer
+				bufLine[idCharLine] = ch;
+				idCharLine++;
+			}
+		}
+		else
+		{
+			if (isFirstLine)
+				isFirstLine = false;
+			else
+			{
+				memset(&fioBuf[0], 0, sizeof(fioBuf));
+				memset(&adressBuf[0], 0, sizeof(adressBuf));
+				memset(&phoneBuf[0], 0, sizeof(phoneBuf));
+				//newline is done
+				bufLine[idCharLine] = '\0';
+				idCharLine = 0;
+				printk(KERN_INFO "line: %s", bufLine);
+				sscanf(bufLine, "%s %s %s", fioBuf, adressBuf, phoneBuf);
+				//copy struct phonebookrecord to phonebook
+				putRecord(book, fioBuf, adressBuf, phoneBuf);
+				printk(KERN_INFO "%s %s %s", fioBuf, adressBuf, phoneBuf);
+		}
+	}
+
+	id++;
+	ch = buf[id];
+	if (ch == '\0')
+		break;
+}
+}
+
 void putRecord(struct PhoneBook *book, char* fio, char* adress,
-		char* phoneNumber)
+	char* phoneNumber)
 {
 	struct PhoneBookRecord r;
-	r.fio = fio;
-	r.phoneNumber = phoneNumber;
-	r.adress = adress;
+	strcpy(r.fio, fio);
+	strcpy(r.phoneNumber, phoneNumber);
+	strcpy(r.adress, adress);
 	book->data[book->lastId++] = r;
 }
 
 char*
 phoneBookRecordToString(char* text, unsigned bufferLenght,
-		struct PhoneBookRecord record)
+	struct PhoneBookRecord record)
 {
 	char str[1024] =
 	{ };
@@ -48,6 +106,8 @@ phoneBookRecordToString(char* text, unsigned bufferLenght,
 char*
 getRecord(char* text, struct PhoneBook book, char* requestString)
 {
+	if (book.data == NULL)
+		return "";
 	const int bufferLenght = 1024;
 	const int bufferLenghtOneRow = 100;
 	char answer[1024] = "Search for ";
@@ -71,14 +131,15 @@ getRecord(char* text, struct PhoneBook book, char* requestString)
 		strcat(answer, ":");
 	}
 
+	printk(KERN_INFO "start searching..");
+
 	for (i = 0; i < book.lastId; i++)
 	{
 		if (isEmpty == false)
 		{
 			if (strncmp(book.data[i].fio, buffer, lenOfRequest) == 0
 					|| strncmp(book.data[i].adress, buffer, lenOfRequest) == 0
-					|| strncmp(book.data[i].phoneNumber, buffer, lenOfRequest)
-							== 0)
+					|| strncmp(book.data[i].phoneNumber, buffer, lenOfRequest) == 0)
 			{
 				strcat(answer, "\n");
 				strncpy(answer,

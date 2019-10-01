@@ -15,17 +15,21 @@
 
 #define DEV_MAJOR 75
 #define DEV_MINOR 0
-#define DEV_NAME "altstu"
+#define DEV_NAME "phonebook"
+
+#define PROCFS_NAME "pb_storage"
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Character device driver AltSTU");
-MODULE_AUTHOR("Folk");
+MODULE_DESCRIPTION("Phonebook");
+MODULE_AUTHOR("-_-");
 
 #define MAXSTR 100
 
 static char msg[MAXSTR] =
 { 0 };
 static int times = 0;
+
+static struct PhoneBook *phonebook;
 
 static int
 dev_open(struct inode*, struct file*);
@@ -39,14 +43,59 @@ dev_write(struct file*, const char*, size_t, loff_t*);
 static struct file_operations fops =
 { .read = dev_read, .open = dev_open, .write = dev_write, .release = dev_rls };
 
+
+void load_from_procfs(void)
+{
+	struct file *f;
+	char buf[128];
+	mm_segment_t fs;
+	int i;
+	for(i=0;i<128;i++)
+		buf[i] = 0;
+	f = filp_open("/proc/pb_storage", O_RDONLY, 0);
+	if (f == NULL)
+	{
+		printk(KERN_ALERT "filp_open error.\n");
+	}
+	else{
+		fs = get_fs();
+		set_fs(KERNEL_DS);
+		f->f_op->read(f, buf, 128, &f->f_pos);
+		set_fs(fs);
+		loadPhoneBook(phonebook, buf, 128);
+	}
+	printk(KERN_INFO "buf:%s\n",buf);
+	filp_close(f, NULL);
+}
+
+void print_phonebook(void)
+{
+
+}
+
+void init_phonebook(void)
+{
+	phonebook = createPhoneBook();
+	if (phonebook == NULL)
+		return;
+	// try to read from procfs
+	load_from_procfs();
+	print_phonebook();
+}
+
 int init_module(void)
 {
 	int t = register_chrdev(DEV_MAJOR, DEV_NAME, &fops);
 
 	if (t < 0)
-	printk (KERN_ALERT "Device registration Failed");
+		printk (KERN_ALERT "Device registration Failed");
 	else
-	printk (KERN_ALERT "Device registered \n");
+	{
+		printk (KERN_ALERT "Device registered \n");
+		init_phonebook();
+		if (phonebook == NULL)
+			printk (KERN_ALERT "Phonebook can`t load properly\n");
+	}
 
 	return t;
 }
@@ -56,9 +105,7 @@ void cleanup_module(void)
 	unregister_chrdev(DEV_MAJOR, DEV_NAME);
 }
 
-/**
- * РћС‚РєСЂС‹С‚РёРµ СѓСЃС‚СЂРѕР№СЃС‚РІР°
- */
+
 static int dev_open(struct inode *inod, struct file *fil)
 {
 	times++;
@@ -67,9 +114,7 @@ static int dev_open(struct inode *inod, struct file *fil)
 	return 0;
 }
 
-/**
- * РћР±СЂР°Р±РѕС‚С‡РёРє С‡С‚РµРЅРёСЏ РґР°РЅРЅС‹С… СЃ СѓСЃС‚СЂРѕР№СЃС‚РІР°
- */
+
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 {
 
@@ -81,33 +126,22 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 	if (copy_to_user(buff, msg, sz))
 		return -EFAULT;
 
-	*off += sz; //РєРѕСЂСЂРµРєС†РёСЏ С‡РёСЃР»Р° РѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… РґР°РЅРЅС‹С…: РёРЅР°С‡Рµ Р±СѓРґРµС‚ РІСЃРµ-РІСЂРµРјСЏ РѕС‚РґР°РІР°С‚СЊ  С‚Сѓ-Р¶Рµ СЃС‚СЂРѕРєСѓ СЃ РЅР°С‡Р°Р»Р°
+	*off += sz;
 
 	return len;
 
 }
 
-/**
- *Р§С‚Рѕ-С‚Рѕ РґРµР»Р°РµРј СЃРѕ СЃС‚СЂРѕРєРѕР№ РѕС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
- */
+
 static void process(void)
 {
-//  char hi[MAXSTR] = "Hello, ";
-//  strncpy (msg, strcat (hi, msg), MAXSTR);
-//  strncpy (msg, strcat (msg, "\n"), MAXSTR);
-	struct PhoneBook *book;
 	char getStr[1024] = { };
-	book = createPhoneBook();
-	putRecord(book, "1", "2", "3");
-//	putRecord(book, "1", "2", "3");
-	strncpy(getStr, getRecord(getStr, *book, msg), MAXSTR);
+	strncpy(getStr, getRecord(getStr, *phonebook, msg), MAXSTR);
 	strncpy(msg, getStr, MAXSTR);
 	strncpy(msg, strcat(msg, "\n"), MAXSTR);
 }
 
-/**
- * РћР±СЂР°Р±РѕС‚С‡РёРє Р·Р°РїРёСЃРё РІ СѓСЃС‚СЂРѕР№СЃС‚РІРѕ
- */
+
 static ssize_t dev_write(struct file *fil, const char *buff, size_t len,
 		loff_t *off)
 {
@@ -119,13 +153,11 @@ static ssize_t dev_write(struct file *fil, const char *buff, size_t len,
 	if (ret)
 		return -EFAULT;
 	msg[len] = '\0';
-	process(); //РѕР±СЂР°Р±РѕС‚РєР° РїРѕСЃР»Рµ РїРѕР»СѓС‡РµРЅРёСЏ С‚СѓС‚
+	process();
 	return len;
 }
 
-/**
- * Р—Р°РєСЂС‹С‚РёРµ СѓСЃС‚СЂРѕР№СЃС‚РІР°
- */
+
 static int dev_rls(struct inode *inod, struct file *fil)
 {
 	printk (KERN_ALERT "Device Closed\n");
